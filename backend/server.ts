@@ -2,6 +2,20 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY!);
 
+// Configuration constants
+const IMAGE_MODEL_NAME = "gemini-2.5-flash-image-preview";
+const MAX_OUTPUT_TOKENS = 4096;
+const DEFAULT_TEMPERATURE = 0.4;
+
+// Reusable model configuration
+const getImageModel = () => genAI.getGenerativeModel({ 
+  model: IMAGE_MODEL_NAME,
+  generationConfig: {
+    temperature: DEFAULT_TEMPERATURE,
+    maxOutputTokens: MAX_OUTPUT_TOKENS,
+  }
+});
+
 async function handleTextToImage(request: Request) {
   try {
     const { prompt } = await request.json();
@@ -18,15 +32,15 @@ async function handleTextToImage(request: Request) {
       });
     }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-image-preview" });
+    const model = getImageModel();
     
     const result = await model.generateContent([prompt]);
 
     const response = result.response;
-    const imageData = response.candidates?.[0]?.content?.parts?.[0];
+    const candidates = response.candidates;
     
-    if (!imageData) {
-      return new Response(JSON.stringify({ error: "Failed to generate image" }), {
+    if (!candidates || candidates.length === 0) {
+      return new Response(JSON.stringify({ error: "No candidates returned from model" }), {
         status: 500,
         headers: { 
           "Content-Type": "application/json",
@@ -37,11 +51,44 @@ async function handleTextToImage(request: Request) {
       });
     }
 
-    return new Response(JSON.stringify({ 
-      success: true, 
-      imageData: imageData,
-      prompt: prompt
-    }), {
+    const parts = candidates[0].content?.parts;
+    if (!parts || parts.length === 0) {
+      return new Response(JSON.stringify({ error: "No parts returned from model" }), {
+        status: 500,
+        headers: { 
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "POST, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type"
+        }
+      });
+    }
+
+    // Find the image data in the response
+    for (const part of parts) {
+      if (part.inlineData) {
+        const imageData = part.inlineData.data;
+        const mimeType = part.inlineData.mimeType || 'image/png';
+        
+        return new Response(JSON.stringify({ 
+          success: true, 
+          imageUrl: `data:${mimeType};base64,${imageData}`,
+          prompt: prompt,
+          mimeType: mimeType
+        }), {
+          headers: { 
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type"
+          }
+        });
+      }
+    }
+
+    // No image data found in any part
+    return new Response(JSON.stringify({ error: "No image data found in response" }), {
+      status: 500,
       headers: { 
         "Content-Type": "application/json",
         "Access-Control-Allow-Origin": "*",
@@ -85,7 +132,7 @@ async function handleImageEdit(request: Request) {
       });
     }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-image-preview" });
+    const model = getImageModel();
     
     const imageBuffer = await image.arrayBuffer();
     const imageBase64 = Buffer.from(imageBuffer).toString('base64');
@@ -101,13 +148,58 @@ async function handleImageEdit(request: Request) {
     ]);
 
     const response = result.response;
-    const imageData = response.candidates?.[0]?.content?.parts?.[0];
+    const candidates = response.candidates;
     
-    return new Response(JSON.stringify({ 
-      success: true, 
-      imageData: imageData,
-      instructions: instructions
-    }), {
+    if (!candidates || candidates.length === 0) {
+      return new Response(JSON.stringify({ error: "No candidates returned from model" }), {
+        status: 500,
+        headers: { 
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "POST, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type"
+        }
+      });
+    }
+
+    const parts = candidates[0].content?.parts;
+    if (!parts || parts.length === 0) {
+      return new Response(JSON.stringify({ error: "No parts returned from model" }), {
+        status: 500,
+        headers: { 
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "POST, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type"
+        }
+      });
+    }
+
+    // Find the image data in the response
+    for (const part of parts) {
+      if (part.inlineData) {
+        const imageData = part.inlineData.data;
+        const mimeType = part.inlineData.mimeType || 'image/png';
+        
+        return new Response(JSON.stringify({ 
+          success: true, 
+          imageUrl: `data:${mimeType};base64,${imageData}`,
+          instructions: instructions,
+          mimeType: mimeType
+        }), {
+          headers: { 
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type"
+          }
+        });
+      }
+    }
+
+    // No image data found in any part
+    return new Response(JSON.stringify({ error: "No image data found in response" }), {
+      status: 500,
       headers: { 
         "Content-Type": "application/json",
         "Access-Control-Allow-Origin": "*",
@@ -151,7 +243,7 @@ async function handleMultiImageComposition(request: Request) {
       });
     }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-image-preview" });
+    const model = getImageModel();
     
     const imageParts = await Promise.all(
       images.map(async (image) => {
@@ -172,13 +264,59 @@ async function handleMultiImageComposition(request: Request) {
     ]);
 
     const response = result.response;
-    const imageData = response.candidates?.[0]?.content?.parts?.[0];
+    const candidates = response.candidates;
     
-    return new Response(JSON.stringify({ 
-      success: true, 
-      imageData: imageData,
-      instructions: instructions
-    }), {
+    if (!candidates || candidates.length === 0) {
+      return new Response(JSON.stringify({ error: "No candidates returned from model" }), {
+        status: 500,
+        headers: { 
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "POST, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type"
+        }
+      });
+    }
+
+    const parts = candidates[0].content?.parts;
+    if (!parts || parts.length === 0) {
+      return new Response(JSON.stringify({ error: "No parts returned from model" }), {
+        status: 500,
+        headers: { 
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "POST, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type"
+        }
+      });
+    }
+
+    // Find the image data in the response
+    for (const part of parts) {
+      if (part.inlineData) {
+        const imageData = part.inlineData.data;
+        const mimeType = part.inlineData.mimeType || 'image/png';
+        
+        return new Response(JSON.stringify({ 
+          success: true, 
+          imageUrl: `data:${mimeType};base64,${imageData}`,
+          instructions: instructions,
+          imageCount: images.length,
+          mimeType: mimeType
+        }), {
+          headers: { 
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type"
+          }
+        });
+      }
+    }
+
+    // No image data found in any part
+    return new Response(JSON.stringify({ error: "No image data found in response" }), {
+      status: 500,
       headers: { 
         "Content-Type": "application/json",
         "Access-Control-Allow-Origin": "*",

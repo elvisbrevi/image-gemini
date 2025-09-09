@@ -34,10 +34,18 @@ export function ImageGenerator({ onImageGenerated }: ImageGeneratorProps) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const blob = await response.blob();
-      const imageUrl = URL.createObjectURL(blob);
-      setGeneratedImage(imageUrl);
-      onImageGenerated?.(imageUrl);
+      const data = await response.json();
+      
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      if (data.success && data.imageUrl) {
+        setGeneratedImage(data.imageUrl);
+        onImageGenerated?.(data.imageUrl);
+      } else {
+        throw new Error('No image URL received from server');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate image');
     } finally {
@@ -104,6 +112,7 @@ export function ImageGenerator({ onImageGenerated }: ImageGeneratorProps) {
                   const link = document.createElement('a');
                   link.href = generatedImage;
                   link.download = 'generated-image.png';
+                  link.target = '_blank';
                   link.click();
                 }}
               >

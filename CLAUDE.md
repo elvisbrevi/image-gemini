@@ -262,3 +262,4 @@ async function handleApiEndpoint(request: Request) {
 **Last Updated**: 2025-09-09
 **Version**: 1.0.0
 **Maintainer**: Claude Code Assistant
+- no usar placeholder ni codigo harcodeado

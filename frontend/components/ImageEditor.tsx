@@ -63,10 +63,18 @@ export function ImageEditor({ onImageEdited }: ImageEditorProps) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const blob = await response.blob();
-      const imageUrl = URL.createObjectURL(blob);
-      setEditedImage(imageUrl);
-      onImageEdited?.(imageUrl);
+      const data = await response.json();
+      
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      if (data.success && data.imageUrl) {
+        setEditedImage(data.imageUrl);
+        onImageEdited?.(data.imageUrl);
+      } else {
+        throw new Error('No image URL received from server');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to edit image');
     } finally {
@@ -183,6 +191,7 @@ export function ImageEditor({ onImageEdited }: ImageEditorProps) {
                   const link = document.createElement('a');
                   link.href = editedImage;
                   link.download = 'edited-image.png';
+                  link.target = '_blank';
                   link.click();
                 }}
               >

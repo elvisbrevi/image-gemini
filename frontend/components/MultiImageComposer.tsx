@@ -75,10 +75,18 @@ export function MultiImageComposer({ onImageComposed }: MultiImageComposerProps)
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const blob = await response.blob();
-      const imageUrl = URL.createObjectURL(blob);
-      setComposedImage(imageUrl);
-      onImageComposed?.(imageUrl);
+      const data = await response.json();
+      
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      if (data.success && data.imageUrl) {
+        setComposedImage(data.imageUrl);
+        onImageComposed?.(data.imageUrl);
+      } else {
+        throw new Error('No image URL received from server');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to compose images');
     } finally {
@@ -215,6 +223,7 @@ export function MultiImageComposer({ onImageComposed }: MultiImageComposerProps)
                   const link = document.createElement('a');
                   link.href = composedImage;
                   link.download = 'composed-image.png';
+                  link.target = '_blank';
                   link.click();
                 }}
               >
