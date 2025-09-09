@@ -8,11 +8,15 @@ import { Loader2, Edit3, Upload, X } from 'lucide-react';
 
 interface ImageEditorProps {
   onImageEdited?: (imageUrl: string) => void;
+  initialImages?: File[];
+  onImagesChange?: (images: File[]) => void;
 }
 
-export function ImageEditor({ onImageEdited }: ImageEditorProps) {
-  const [originalImage, setOriginalImage] = useState<File | null>(null);
-  const [originalImageUrl, setOriginalImageUrl] = useState<string | null>(null);
+export function ImageEditor({ onImageEdited, initialImages = [], onImagesChange }: ImageEditorProps) {
+  const [originalImage, setOriginalImage] = useState<File | null>(initialImages[0] || null);
+  const [originalImageUrl, setOriginalImageUrl] = useState<string | null>(
+    initialImages[0] ? URL.createObjectURL(initialImages[0]) : null
+  );
   const [instructions, setInstructions] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [editedImage, setEditedImage] = useState<string | null>(null);
@@ -27,6 +31,7 @@ export function ImageEditor({ onImageEdited }: ImageEditorProps) {
       setOriginalImageUrl(url);
       setEditedImage(null);
       setError(null);
+      onImagesChange?.([file]);
     }
   };
 
@@ -41,6 +46,7 @@ export function ImageEditor({ onImageEdited }: ImageEditorProps) {
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+    onImagesChange?.([]);
   };
 
   const handleEdit = async () => {
@@ -187,12 +193,21 @@ export function ImageEditor({ onImageEdited }: ImageEditorProps) {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  const link = document.createElement('a');
-                  link.href = editedImage;
-                  link.download = 'edited-image.png';
-                  link.target = '_blank';
-                  link.click();
+                onClick={async () => {
+                  try {
+                    const response = await fetch(editedImage);
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `edited-image-${Date.now()}.png`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+                  } catch (error) {
+                    console.error('Download failed:', error);
+                  }
                 }}
               >
                 Download

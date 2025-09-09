@@ -11,6 +11,11 @@ import { Image as ImageIcon, Edit3, Layers, MessageSquare, Sparkles } from 'luci
 
 export function App() {
   const [sharedImage, setSharedImage] = useState<string | null>(null);
+  const [uploadedImages, setUploadedImages] = useState<{[key: string]: File[]}>({
+    edit: [],
+    compose: [],
+    refine: []
+  });
 
   const handleImageGenerated = (imageUrl: string) => {
     setSharedImage(imageUrl);
@@ -26,6 +31,13 @@ export function App() {
 
   const handleRefinementComplete = (imageUrl: string) => {
     setSharedImage(imageUrl);
+  };
+
+  const handleImagesUploaded = (tabKey: string, images: File[]) => {
+    setUploadedImages(prev => ({
+      ...prev,
+      [tabKey]: images
+    }));
   };
 
   return (
@@ -90,7 +102,11 @@ export function App() {
                     Upload an image and describe how you'd like it modified
                   </p>
                 </div>
-                <ImageEditor onImageEdited={handleImageEdited} />
+                <ImageEditor 
+                  onImageEdited={handleImageEdited}
+                  initialImages={uploadedImages.edit}
+                  onImagesChange={(images) => handleImagesUploaded('edit', images)}
+                />
               </div>
             </TabsContent>
 
@@ -102,7 +118,11 @@ export function App() {
                     Combine multiple images into a single masterpiece
                   </p>
                 </div>
-                <MultiImageComposer onImageComposed={handleImageComposed} />
+                <MultiImageComposer 
+                  onImageComposed={handleImageComposed}
+                  initialImages={uploadedImages.compose}
+                  onImagesChange={(images) => handleImagesUploaded('compose', images)}
+                />
               </div>
             </TabsContent>
 
@@ -115,8 +135,10 @@ export function App() {
                   </p>
                 </div>
                 <IterativeRefinement 
-                  initialImage={sharedImage}
-                  onRefinementComplete={handleRefinementComplete} 
+                  initialImage={sharedImage || undefined}
+                  onRefinementComplete={handleRefinementComplete}
+                  initialImages={uploadedImages.refine}
+                  onImagesChange={(images) => handleImagesUploaded('refine', images)}
                 />
               </div>
             </TabsContent>

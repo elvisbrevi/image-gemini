@@ -8,11 +8,15 @@ import { Loader2, Layers, Upload, X, Image as ImageIcon } from 'lucide-react';
 
 interface MultiImageComposerProps {
   onImageComposed?: (imageUrl: string) => void;
+  initialImages?: File[];
+  onImagesChange?: (images: File[]) => void;
 }
 
-export function MultiImageComposer({ onImageComposed }: MultiImageComposerProps) {
-  const [selectedImages, setSelectedImages] = useState<File[]>([]);
-  const [imageUrls, setImageUrls] = useState<string[]>([]);
+export function MultiImageComposer({ onImageComposed, initialImages = [], onImagesChange }: MultiImageComposerProps) {
+  const [selectedImages, setSelectedImages] = useState<File[]>(initialImages);
+  const [imageUrls, setImageUrls] = useState<string[]>(
+    initialImages.map(file => URL.createObjectURL(file))
+  );
   const [instructions, setInstructions] = useState('');
   const [isComposing, setIsComposing] = useState(false);
   const [composedImage, setComposedImage] = useState<string | null>(null);
@@ -22,11 +26,13 @@ export function MultiImageComposer({ onImageComposed }: MultiImageComposerProps)
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
     if (files.length > 0) {
-      setSelectedImages(prev => [...prev, ...files]);
+      const newImages = [...selectedImages, ...files];
+      setSelectedImages(newImages);
       const urls = files.map(file => URL.createObjectURL(file));
       setImageUrls(prev => [...prev, ...urls]);
       setComposedImage(null);
       setError(null);
+      onImagesChange?.(newImages);
     }
   };
 
@@ -36,10 +42,12 @@ export function MultiImageComposer({ onImageComposed }: MultiImageComposerProps)
       URL.revokeObjectURL(urlToRevoke);
     }
     
-    setSelectedImages(prev => prev.filter((_, i) => i !== index));
+    const newImages = selectedImages.filter((_, i) => i !== index);
+    setSelectedImages(newImages);
     setImageUrls(prev => prev.filter((_, i) => i !== index));
     setComposedImage(null);
     setError(null);
+    onImagesChange?.(newImages);
   };
 
   const clearAllImages = () => {
@@ -51,6 +59,7 @@ export function MultiImageComposer({ onImageComposed }: MultiImageComposerProps)
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+    onImagesChange?.([]);
   };
 
   const handleCompose = async () => {
@@ -219,12 +228,21 @@ export function MultiImageComposer({ onImageComposed }: MultiImageComposerProps)
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  const link = document.createElement('a');
-                  link.href = composedImage;
-                  link.download = 'composed-image.png';
-                  link.target = '_blank';
-                  link.click();
+                onClick={async () => {
+                  try {
+                    const response = await fetch(composedImage);
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `composed-image-${Date.now()}.png`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+                  } catch (error) {
+                    console.error('Download failed:', error);
+                  }
                 }}
               >
                 Download

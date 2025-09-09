@@ -108,12 +108,21 @@ export function ImageGenerator({ onImageGenerated }: ImageGeneratorProps) {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  const link = document.createElement('a');
-                  link.href = generatedImage;
-                  link.download = 'generated-image.png';
-                  link.target = '_blank';
-                  link.click();
+                onClick={async () => {
+                  try {
+                    const response = await fetch(generatedImage);
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `generated-image-${Date.now()}.png`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+                  } catch (error) {
+                    console.error('Download failed:', error);
+                  }
                 }}
               >
                 Download
